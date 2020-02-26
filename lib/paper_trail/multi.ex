@@ -161,7 +161,7 @@ defmodule PaperTrail.Multi do
       event: "update",
       item_type: get_item_type(changeset),
       item_id: get_model_id(changeset),
-      item_changes: changeset.changes,
+      item_changes: serialize_changes(changeset, options),
       originator_id:
         case originator_ref do
           nil -> nil
@@ -214,6 +214,31 @@ defmodule PaperTrail.Multi do
   defp serialize(model) do
     relationships = model.__struct__.__schema__(:associations)
     Map.drop(model, [:__struct__, :__meta__] ++ relationships)
+  end
+
+  defp serialize_changes(changeset, options) do
+    model = changeset.data
+    changes = changeset.changes
+    relationships = model.__struct__.__schema__(:associations)
+
+    case Map.split(changes, relationships) do
+      {associations, local_changes} when map_size(associations) == 0 ->
+        local_changes
+
+      {associations, local_changes} ->
+        associations
+        |> Enum.into(%{}, fn {key, value} ->
+          value_version =
+            if is_list(value) do
+              Enum.map(value, &make_version_struct(%{event: "update"}, &1, options))
+            else
+              make_version_struct(%{event: "update"}, value, options)
+            end
+
+          {key, value_version}
+        end)
+        |> Map.merge(local_changes)
+    end
   end
 
   defp add_prefix(changeset, nil), do: changeset
