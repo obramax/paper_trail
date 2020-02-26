@@ -219,7 +219,9 @@ defmodule PaperTrail.Multi do
   defp serialize_changes(changeset, options) do
     model = changeset.data
     changes = changeset.changes
-    relationships = model.__struct__.__schema__(:associations)
+    associations = model.__struct__.__schema__(:associations)
+    embeds = model.__struct__.__schema__(:embeds)
+    relationships = associations ++ embeds
 
     case Map.split(changes, relationships) do
       {associations, local_changes} when map_size(associations) == 0 ->
